@@ -1,5 +1,7 @@
 const express = require("express");
+const puppeteer = require("puppeteer-core");
 const CharacterAI = require("node_characterai");
+const { ChromiumDownloader } = require("chrome-aws-lambda");
 
 const app = express();
 const characterAI = new CharacterAI();
@@ -18,6 +20,13 @@ app.get("/", async (req, res) => {
       isAuthed = true;
     }
 
+    const executablePath = await ChromiumDownloader.local();
+
+    const browser = await puppeteer.launch({
+      executablePath,
+      args: ['--no-sandbox'], // Add any additional args you need
+    });
+
     const chat = await characterAI.createOrContinueChat(characterId);
     const start = Date.now();
 
@@ -29,8 +38,11 @@ app.get("/", async (req, res) => {
     const jsonResponse = {
       Developer: "Sazumi Viki",
       Loader: `${elapsedTime} ms`,
-      Response: response.text
+      Response: response.text,
     };
+
+    // Close the browser after use
+    await browser.close();
 
     res.setHeader("Content-Type", "application/json");
     res.send(JSON.stringify(jsonResponse, null, 2));
