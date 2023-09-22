@@ -1,5 +1,5 @@
 const express = require("express");
-const puppeteer = require("puppeteer-core");
+const puppeteer = require("puppeteer");
 const CharacterAI = require("node_characterai");
 
 const app = express();
@@ -20,8 +20,6 @@ app.get("/", async (req, res) => {
     }
 
     const browser = await puppeteer.launch({
-      // Use puppeteer-core's executablePath for the bundled Chromium
-      executablePath: puppeteer.executablePath(),
       args: ['--no-sandbox'], // Add any additional args you need
     });
 
