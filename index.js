@@ -6,11 +6,13 @@ const app = express();
 const characterAI = new CharacterAI();
 let isAuthenticated = false;
 
+process.setMaxListeners(20);
+
 app.use(express.json());
 
 async function initializeBrowser() {
   const browser = await puppeteer.launch({
-    headless: true,
+    headless: "new",
     args: ['--no-sandbox'],
   });
 
