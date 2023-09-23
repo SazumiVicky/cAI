@@ -3,10 +3,6 @@ const puppeteer = require("puppeteer");
 const CharacterAI = require("node_characterai");
 
 const app = express();
-const characterAI = new CharacterAI();
-let isAuthenticated = false;
-
-process.setMaxListeners(20);
 
 app.use(express.json());
 
@@ -34,12 +30,10 @@ app.get("/", async (req, res) => {
       throw new Error("Missing required parameters");
     }
 
-    if (!isAuthenticated) {
-      await characterAI.authenticateWithToken(accessToken);
-      isAuthenticated = true;
-    }
-
-    const chat = await characterAI.createOrContinueChat(characterId);
+    const isolatedCharacterAI = new CharacterAI();
+    await isolatedCharacterAI.authenticateWithToken(accessToken);
+    
+    const chat = await isolatedCharacterAI.createOrContinueChat(characterId);
     const start = Date.now();
 
     const browser = await initializeBrowser();
