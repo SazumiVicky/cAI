@@ -73,8 +73,11 @@ app.get("/", (req, res) => {
   const message = req.query.teks;
   const accessToken = req.query.token;
 
-  // Tambahkan tugas ke antrian
-  queue.push({ characterId, message, accessToken, res });
+  queue.push({ characterId, message, accessToken, res }, (error) => {
+    if (error) {
+      console.error("Error in queue callback:", error.message);
+    }
+  });
 });
 
 const PORT = process.env.PORT || 3000;
