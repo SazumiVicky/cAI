@@ -16,6 +16,11 @@ async function initializeBrowser() {
       args: ['--no-sandbox'],
     });
 
+    browser.on('disconnected', () => {
+      console.log('Browser disconnected. Reinitializing...');
+      initializeBrowser();
+    });
+
     const pages = await browser.pages();
     const page = pages[0];
     await page.setRequestInterception(true);
@@ -40,8 +45,14 @@ app.get("/", async (req, res) => {
     }
 
     if (!isAuthed) {
-      await characterAI.authenticateWithToken(accessToken);
-      isAuthed = true;
+      try {
+        await characterAI.authenticateWithToken(accessToken);
+        isAuthed = true;
+      } catch (authError) {
+        console.error("Authentication error:", authError.message);
+        res.status(401).json({ error: "Authentication token is invalid" });
+        return;
+      }
     }
 
     if (!browser) {
