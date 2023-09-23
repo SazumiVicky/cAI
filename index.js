@@ -1,31 +1,51 @@
 const express = require("express");
 const puppeteer = require("puppeteer");
 const CharacterAI = require("node_characterai");
+const fs = require("fs/promises");
+const path = require("path");
 
 const app = express();
 const characterAI = new CharacterAI();
-let isAuthed = false;
-let browser;
+const sessions = {};
+const databaseFilePath = path.join(__dirname, "database.json");
+const requestQueue = [];
 
 app.use(express.json());
 
 async function initializeBrowser() {
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox'],
+  });
+
+  browser.on('disconnected', () => {
+    console.log('Browser disconnected. Reinitializing...');
+    initializeBrowser();
+  });
+
+  return browser;
+}
+
+async function loadSessionsFromDatabase() {
   try {
-    browser = await puppeteer.launch({
-      headless: "new",
-      args: ['--no-sandbox'],
-    });
-
-    const pages = await browser.pages();
-    const page = pages[0];
-    await page.setRequestInterception(true);
-
-    page.on('request', (request) => {
-      request.continue();
-    });
+    const data = await fs.readFile(databaseFilePath, "utf8");
+    const parsedData = JSON.parse(data);
+    if (parsedData && typeof parsedData === "object") {
+      Object.assign(sessions, parsedData);
+    }
   } catch (error) {
-    console.error("Error initializing browser:", error);
-    throw error;
+    if (error.code === "ENOENT") {
+    } else {
+      console.error("Error loading sessions from database:", error);
+    }
+  }
+}
+
+async function saveSessionsToDatabase() {
+  try {
+    await fs.writeFile(databaseFilePath, JSON.stringify(sessions, null, 2), "utf8");
+  } catch (error) {
+    console.error("Error saving sessions to database:", error);
   }
 }
 
@@ -39,17 +59,48 @@ app.get("/", async (req, res) => {
       throw new Error("Missing required parameters");
     }
 
-    if (!isAuthed) {
+    if (!sessions[accessToken]) {
+      sessions[accessToken] = {
+        isAuthenticated: false,
+        browser: null,
+        requestQueue: [],
+      };
+    }
+
+    const session = sessions[accessToken];
+
+    if (!session.isAuthenticated) {
       await characterAI.authenticateWithToken(accessToken);
-      isAuthed = true;
+      session.isAuthenticated = true;
     }
 
-    if (!browser) {
-      await initializeBrowser();
+    if (!session.browser) {
+      session.browser = await initializeBrowser();
     }
 
+    session.requestQueue.push({ characterId, message, accessToken, res });
+
+    if (session.requestQueue.length === 1) {
+      processQueue(session);
+    }
+  } catch (error) {
+    console.error("Error:", error.message);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+async function processQueue(session) {
+  const { characterId, message, accessToken, res } = session.requestQueue[0];
+
+  try {
     const chat = await characterAI.createOrContinueChat(characterId);
     const start = Date.now();
+
+    const page = (await session.browser.pages())[0];
+    page.removeAllListeners('request');
+    page.on('request', (request) => {
+      request.continue();
+    });
 
     const response = await chat.sendAndAwaitResponse(message, true);
 
@@ -64,11 +115,21 @@ app.get("/", async (req, res) => {
 
     res.setHeader("Content-Type", "application/json");
     res.send(JSON.stringify(jsonResponse, null, 2));
+
+    session.requestQueue.shift();
+
+    if (session.requestQueue.length > 0) {
+      processQueue(session);
+    }
+
+    await saveSessionsToDatabase();
   } catch (error) {
     console.error("Error:", error.message);
     res.status(500).json({ error: error.message || "Internal server error" });
   }
-});
+}
+
+loadSessionsFromDatabase();
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
