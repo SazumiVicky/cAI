@@ -1,13 +1,10 @@
 const express = require("express");
 const puppeteer = require("puppeteer");
 const CharacterAI = require("node_characterai");
-const fs = require("fs/promises");
-const path = require("path");
 
 const app = express();
 const characterAI = new CharacterAI();
 const sessions = {};
-const databaseFilePath = path.join(__dirname, "database.json");
 
 app.use(express.json());
 
@@ -25,29 +22,6 @@ async function initializeBrowser() {
   return browser;
 }
 
-async function loadSessionsFromDatabase() {
-  try {
-    const data = await fs.readFile(databaseFilePath, "utf8");
-    const parsedData = JSON.parse(data);
-    if (parsedData && typeof parsedData === "object") {
-      Object.assign(sessions, parsedData);
-    }
-  } catch (error) {
-    if (error.code === "ENOENT") {
-    } else {
-      console.error("Error loading sessions from database:", error);
-    }
-  }
-}
-
-async function saveSessionsToDatabase() {
-  try {
-    await fs.writeFile(databaseFilePath, JSON.stringify(sessions, null, 2), "utf8");
-  } catch (error) {
-    console.error("Error saving sessions to database:", error);
-  }
-}
-
 app.get("/", async (req, res) => {
   const characterId = req.query.id;
   const message = req.query.teks;
@@ -58,16 +32,15 @@ app.get("/", async (req, res) => {
       throw new Error("Missing required parameters");
     }
 
-    const sessionData = sessions[accessToken];
+    let session = sessions[accessToken];
 
-    if (!sessionData) {
-      sessions[accessToken] = {
+    if (!session) {
+      session = {
         isAuthenticated: false,
         browser: null,
       };
+      sessions[accessToken] = session;
     }
-
-    const session = sessions[accessToken];
 
     if (!session.isAuthenticated) {
       await characterAI.authenticateWithToken(accessToken);
@@ -81,7 +54,8 @@ app.get("/", async (req, res) => {
     const chat = await characterAI.createOrContinueChat(characterId);
     const start = Date.now();
 
-    const page = (await session.browser.pages())[0];
+    const page = await session.browser.newPage();
+    await page.setRequestInterception(true);
     page.removeAllListeners('request');
     page.on('request', (request) => {
       request.continue();
@@ -100,15 +74,16 @@ app.get("/", async (req, res) => {
 
     res.setHeader("Content-Type", "application/json");
     res.send(JSON.stringify(jsonResponse, null, 2));
-
-    await saveSessionsToDatabase(); // Simpan seluruh objek sessions
   } catch (error) {
-    console.error("Error:", error.message);
-    res.status(500).json({ error: error.message || "Internal server error" });
+    if (error.message === "Already authenticated") {
+      console.error("Error:", error.message);
+      res.status(400).json({ error: error.message });
+    } else {
+      console.error("Error:", error.message);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    }
   }
 });
-
-loadSessionsFromDatabase();
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
