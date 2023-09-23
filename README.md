@@ -90,4 +90,9 @@ const queue = async.queue(async (task, callback) => {
       callback(error);
     }
   }
-}, 
+},
+```
+
+#### Thanks To
+
+- [realcoloride/node_characterai](https://github.com/realcoloride/node_characterai)
