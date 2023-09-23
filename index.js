@@ -45,12 +45,16 @@ const queue = async.queue(async (task, callback) => {
     res.setHeader("Content-Type", "application/json");
     res.send(JSON.stringify(jsonResponse, null, 2));
     
-    callback();
+    if (typeof callback === 'function') {
+      callback();
+    }
   } catch (error) {
     console.error("Error:", error.message);
     res.status(500).json({ error: error.message || "Internal server error" });
     
-    callback(error);
+    if (typeof callback === 'function') {
+      callback(error);
+    }
   }
 }, 1);
 
