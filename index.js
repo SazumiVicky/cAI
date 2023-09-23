@@ -14,13 +14,17 @@ app.get("/", async (req, res) => {
   const accessToken = req.query.token;
 
   try {
+    if (!characterId || !message || !accessToken) {
+      throw new Error("Missing required parameters");
+    }
+
     if (!isAuthed) {
       await characterAI.authenticateWithToken(accessToken);
       isAuthed = true;
     }
 
     const browser = await puppeteer.launch({
-      headless: "new",
+      headless: true,
       args: ['--no-sandbox'],
     });
 
@@ -43,7 +47,7 @@ app.get("/", async (req, res) => {
     res.setHeader("Content-Type", "application/json");
     res.send(JSON.stringify(jsonResponse, null, 2));
   } catch (error) {
-    console.error(error);
+    console.error("Error:", error.message);
     res.status(500).json({ error: error.message || "Internal server error" });
   }
 });
