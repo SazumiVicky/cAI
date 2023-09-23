@@ -4,7 +4,7 @@ const CharacterAI = require("node_characterai");
 
 const app = express();
 const characterAI = new CharacterAI();
-const sessions = {};
+const sessions = new Map();
 
 app.use(express.json());
 
@@ -32,14 +32,14 @@ app.get("/", async (req, res) => {
       throw new Error("Missing required parameters");
     }
 
-    let session = sessions[accessToken];
+    let session = sessions.get(accessToken);
 
     if (!session) {
       session = {
         isAuthenticated: false,
         browser: null,
       };
-      sessions[accessToken] = session;
+      sessions.set(accessToken, session);
     }
 
     if (!session.isAuthenticated) {
