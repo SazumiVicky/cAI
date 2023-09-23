@@ -8,7 +8,6 @@ const app = express();
 const characterAI = new CharacterAI();
 const sessions = {};
 const databaseFilePath = path.join(__dirname, "database.json");
-const requestQueue = [];
 
 app.use(express.json());
 
@@ -63,7 +62,6 @@ app.get("/", async (req, res) => {
       sessions[accessToken] = {
         isAuthenticated: false,
         browser: null,
-        requestQueue: [],
       };
     }
 
@@ -78,21 +76,6 @@ app.get("/", async (req, res) => {
       session.browser = await initializeBrowser();
     }
 
-    session.requestQueue.push({ characterId, message, accessToken, res });
-
-    if (session.requestQueue.length === 1) {
-      processQueue(session);
-    }
-  } catch (error) {
-    console.error("Error:", error.message);
-    res.status(500).json({ error: error.message || "Internal server error" });
-  }
-});
-
-async function processQueue(session) {
-  const { characterId, message, accessToken, res } = session.requestQueue[0];
-
-  try {
     const chat = await characterAI.createOrContinueChat(characterId);
     const start = Date.now();
 
@@ -115,19 +98,13 @@ async function processQueue(session) {
 
     res.setHeader("Content-Type", "application/json");
     res.send(JSON.stringify(jsonResponse, null, 2));
-
-    session.requestQueue.shift();
-
-    if (session.requestQueue.length > 0) {
-      processQueue(session);
-    }
-
+    
     await saveSessionsToDatabase();
   } catch (error) {
     console.error("Error:", error.message);
     res.status(500).json({ error: error.message || "Internal server error" });
   }
-}
+});
 
 loadSessionsFromDatabase();
 
