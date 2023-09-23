@@ -58,7 +58,9 @@ app.get("/", async (req, res) => {
       throw new Error("Missing required parameters");
     }
 
-    if (!sessions[accessToken]) {
+    const sessionData = sessions[accessToken];
+
+    if (!sessionData) {
       sessions[accessToken] = {
         isAuthenticated: false,
         browser: null,
@@ -98,8 +100,8 @@ app.get("/", async (req, res) => {
 
     res.setHeader("Content-Type", "application/json");
     res.send(JSON.stringify(jsonResponse, null, 2));
-    
-    await saveSessionsToDatabase();
+
+    await saveSessionsToDatabase(); // Simpan seluruh objek sessions
   } catch (error) {
     console.error("Error:", error.message);
     res.status(500).json({ error: error.message || "Internal server error" });
