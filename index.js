@@ -4,7 +4,6 @@ const CharacterAI = require("node_characterai");
 
 const app = express();
 const characterAI = new CharacterAI();
-const sessions = new Map();
 
 app.use(express.json());
 
@@ -32,29 +31,13 @@ app.get("/", async (req, res) => {
       throw new Error("Missing required parameters");
     }
 
-    let session = sessions.get(accessToken);
-
-    if (!session) {
-      session = {
-        isAuthenticated: false,
-        browser: null,
-      };
-      sessions.set(accessToken, session);
-    }
-
-    if (!session.isAuthenticated) {
-      await characterAI.authenticateWithToken(accessToken);
-      session.isAuthenticated = true;
-    }
-
-    if (!session.browser) {
-      session.browser = await initializeBrowser();
-    }
+    await characterAI.authenticateWithToken(accessToken);
 
     const chat = await characterAI.createOrContinueChat(characterId);
     const start = Date.now();
 
-    const page = await session.browser.newPage();
+    const browser = await initializeBrowser();
+    const page = await browser.newPage();
     await page.setRequestInterception(true);
     page.removeAllListeners('request');
     page.on('request', (request) => {
@@ -74,14 +57,11 @@ app.get("/", async (req, res) => {
 
     res.setHeader("Content-Type", "application/json");
     res.send(JSON.stringify(jsonResponse, null, 2));
+    
+    await browser.close();
   } catch (error) {
-    if (error.message === "Already authenticated") {
-      console.error("Error:", error.message);
-      res.status(400).json({ error: error.message });
-    } else {
-      console.error("Error:", error.message);
-      res.status(500).json({ error: error.message || "Internal server error" });
-    }
+    console.error("Error:", error.message);
+    res.status(500).json({ error: error.message || "Internal server error" });
   }
 });
 
