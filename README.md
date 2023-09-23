@@ -1,8 +1,7 @@
- Assistant
 #### Step-by-Step Explanation:
 
 #### 1. Import the required modules:
-```
+```javascript
 const express = require("express");
 const puppeteer = require("puppeteer");
 const CharacterAI = require("node_characterai");
@@ -10,17 +9,17 @@ const async = require("async");
 ```
 
 #### 2. Create an Express app:
-```
+```javascript
 const app = express();
 ```
 
 #### 3. Use the express.json() middleware to parse JSON requests:
-```
+```javascript
 app.use(express.json());
 ```
 
 #### 4. Create an async queue to handle requests:
-```
+```javascript
 const queue = async.queue(async (task, callback) => {
   const { characterId, message, accessToken, res } = task;
   
