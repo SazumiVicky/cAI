@@ -10,18 +10,23 @@ let browser;
 app.use(express.json());
 
 async function initializeBrowser() {
-  browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox'],
-  });
+  try {
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox'],
+    });
 
-  const pages = await browser.pages();
-  const page = pages[0];
-  await page.setRequestInterception(true);
+    const pages = await browser.pages();
+    const page = pages[0];
+    await page.setRequestInterception(true);
 
-  page.on('request', (request) => {
-    request.continue();
-  });
+    page.on('request', (request) => {
+      request.continue();
+    });
+  } catch (error) {
+    console.error("Error initializing browser:", error);
+    throw error;
+  }
 }
 
 app.get("/", async (req, res) => {
