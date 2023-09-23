@@ -1,37 +1,28 @@
 const express = require("express");
 const puppeteer = require("puppeteer");
 const CharacterAI = require("node_characterai");
+const fs = require("fs/promises");
+const path = require("path");
 
 const app = express();
 const characterAI = new CharacterAI();
-let isAuthed = false;
-let browser;
+const sessions = {};
+const databaseFilePath = path.join(__dirname, "database.json");
 
 app.use(express.json());
 
 async function initializeBrowser() {
-  try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox'],
-    });
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox'],
+  });
 
-    browser.on('disconnected', () => {
-      console.log('Browser disconnected. Reinitializing...');
-      initializeBrowser();
-    });
+  browser.on('disconnected', () => {
+    console.log('Browser disconnected. Reinitializing...');
+    initializeBrowser();
+  });
 
-    const pages = await browser.pages();
-    const page = pages[0];
-    await page.setRequestInterception(true);
-
-    page.on('request', (request) => {
-      request.continue();
-    });
-  } catch (error) {
-    console.error("Error initializing browser:", error);
-    throw error;
-  }
+  return browser;
 }
 
 app.get("/", async (req, res) => {
@@ -44,28 +35,29 @@ app.get("/", async (req, res) => {
       throw new Error("Missing required parameters");
     }
 
-    if (!isAuthed) {
-      try {
-        await characterAI.authenticateWithToken(accessToken);
-        isAuthed = true;
-      } catch (authError) {
-        console.error("Authentication error:", authError.message);
-        res.status(401).json({ error: "Authentication token is invalid" });
-        return;
-      }
+    if (!sessions[accessToken]) {
+      sessions[accessToken] = {
+        isAuthenticated: false,
+        browser: null,
+      };
     }
 
-    if (!browser) {
-      await initializeBrowser();
+    const session = sessions[accessToken];
+
+    if (!session.isAuthenticated) {
+      await characterAI.authenticateWithToken(accessToken);
+      session.isAuthenticated = true;
+    }
+
+    if (!session.browser) {
+      session.browser = await initializeBrowser();
     }
 
     const chat = await characterAI.createOrContinueChat(characterId);
     const start = Date.now();
 
-    const page = (await browser.pages())[0];
-
+    const page = (await session.browser.pages())[0];
     page.removeAllListeners('request');
-
     page.on('request', (request) => {
       request.continue();
     });
