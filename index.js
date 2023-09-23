@@ -25,6 +25,29 @@ async function initializeBrowser() {
   return browser;
 }
 
+async function loadSessionsFromDatabase() {
+  try {
+    const data = await fs.readFile(databaseFilePath, "utf8");
+    const parsedData = JSON.parse(data);
+    if (parsedData && typeof parsedData === "object") {
+      Object.assign(sessions, parsedData);
+    }
+  } catch (error) {
+    if (error.code === "ENOENT") {
+    } else {
+      console.error("Error loading sessions from database:", error);
+    }
+  }
+}
+
+async function saveSessionsToDatabase() {
+  try {
+    await fs.writeFile(databaseFilePath, JSON.stringify(sessions, null, 2), "utf8");
+  } catch (error) {
+    console.error("Error saving sessions to database:", error);
+  }
+}
+
 app.get("/", async (req, res) => {
   const characterId = req.query.id;
   const message = req.query.teks;
@@ -75,11 +98,15 @@ app.get("/", async (req, res) => {
 
     res.setHeader("Content-Type", "application/json");
     res.send(JSON.stringify(jsonResponse, null, 2));
+    
+    await saveSessionsToDatabase();
   } catch (error) {
     console.error("Error:", error.message);
     res.status(500).json({ error: error.message || "Internal server error" });
   }
 });
+
+loadSessionsFromDatabase();
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
