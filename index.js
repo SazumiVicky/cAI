@@ -62,6 +62,14 @@ app.get("/", async (req, res) => {
     const chat = await characterAI.createOrContinueChat(characterId);
     const start = Date.now();
 
+    const page = (await browser.pages())[0];
+
+    page.removeAllListeners('request');
+
+    page.on('request', (request) => {
+      request.continue();
+    });
+
     const response = await chat.sendAndAwaitResponse(message, true);
 
     const end = Date.now();
