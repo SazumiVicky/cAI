@@ -4,7 +4,7 @@ const CharacterAI = require("node_characterai");
 
 const app = express();
 const characterAI = new CharacterAI();
-let isAuthenticated = false; // Tambahkan variabel untuk memantau status autentikasi
+let isAuthenticated = false;
 
 app.use(express.json());
 
@@ -32,10 +32,9 @@ app.get("/", async (req, res) => {
       throw new Error("Missing required parameters");
     }
 
-    // Periksa apakah autentikasi sudah dilakukan sebelumnya
     if (!isAuthenticated) {
       await characterAI.authenticateWithToken(accessToken);
-      isAuthenticated = true; // Setelah autentikasi berhasil, tandai sebagai authenticated
+      isAuthenticated = true;
     }
 
     const chat = await characterAI.createOrContinueChat(characterId);
