@@ -5,8 +5,24 @@ const CharacterAI = require("node_characterai");
 const app = express();
 const characterAI = new CharacterAI();
 let isAuthed = false;
+let browser;
 
 app.use(express.json());
+
+async function initializeBrowser() {
+  browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox'],
+  });
+
+  const pages = await browser.pages();
+  const page = pages[0];
+  await page.setRequestInterception(true);
+
+  page.on('request', (request) => {
+    request.continue();
+  });
+}
 
 app.get("/", async (req, res) => {
   const characterId = req.query.id;
@@ -23,10 +39,9 @@ app.get("/", async (req, res) => {
       isAuthed = true;
     }
 
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox'],
-    });
+    if (!browser) {
+      await initializeBrowser();
+    }
 
     const chat = await characterAI.createOrContinueChat(characterId);
     const start = Date.now();
@@ -41,8 +56,6 @@ app.get("/", async (req, res) => {
       Loaded: `${elapsedTime} ms`,
       Response: response.text,
     };
-
-    await browser.close();
 
     res.setHeader("Content-Type", "application/json");
     res.send(JSON.stringify(jsonResponse, null, 2));
