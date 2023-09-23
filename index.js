@@ -68,12 +68,9 @@ app.get("/", async (req, res) => {
     const session = sessions[accessToken];
 
     if (!session.isAuthenticated) {
+      session.browser = await initializeBrowser();
       await characterAI.authenticateWithToken(accessToken);
       session.isAuthenticated = true;
-    }
-
-    if (!session.browser) {
-      session.browser = await initializeBrowser();
     }
 
     const chat = await characterAI.createOrContinueChat(characterId);
