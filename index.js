@@ -7,9 +7,34 @@ const app = express();
 
 app.use(express.json());
 
+let browser;
+
+async function initializeBrowser() {
+  if (browser) {
+    return browser;
+  }
+
+  try {
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox'],
+    });
+
+    browser.on('disconnected', () => {
+      console.log('Browser disconnected. Reinitializing...');
+      setTimeout(initializeBrowser, 1000);
+    });
+
+    return browser;
+  } catch (error) {
+    console.error('Failed to initialize the browser:', error);
+    throw error;
+  }
+}
+
 const queue = async.queue(async (task, callback) => {
   const { characterId, message, accessToken, res } = task;
-  
+
   try {
     if (!characterId || !message || !accessToken) {
       throw new Error("Missing required parameters");
@@ -44,33 +69,19 @@ const queue = async.queue(async (task, callback) => {
 
     res.setHeader("Content-Type", "application/json");
     res.send(JSON.stringify(jsonResponse, null, 2));
-    
+
     if (typeof callback === 'function') {
       callback();
     }
   } catch (error) {
     console.error("Error:", error.message);
     res.status(500).json({ error: error.message || "Internal server error" });
-    
+
     if (typeof callback === 'function') {
       callback(error);
     }
   }
 }, 1);
-
-async function initializeBrowser() {
-  const browser = await puppeteer.launch({
-    headless: "new",
-    args: ['--no-sandbox'],
-  });
-
-  browser.on('disconnected', () => {
-    console.log('Browser disconnected. Reinitializing...');
-    initializeBrowser();
-  });
-
-  return browser;
-}
 
 app.get("/", (req, res) => {
   const characterId = req.query.id;
