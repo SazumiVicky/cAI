@@ -1,36 +1,11 @@
 const express = require("express");
-const puppeteer = require("puppeteer");
+const { chromium } = require("playwright");
 const CharacterAI = require("node_characterai");
 const async = require("async");
 
 const app = express();
 
 app.use(express.json());
-
-let browser;
-
-async function initializeBrowser() {
-  if (browser) {
-    return browser;
-  }
-
-  try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox'],
-    });
-
-    browser.on('disconnected', () => {
-      console.log('Browser disconnected. Reinitializing...');
-      setTimeout(initializeBrowser, 1000);
-    });
-
-    return browser;
-  } catch (error) {
-    console.error('Failed to initialize the browser:', error);
-    throw error;
-  }
-}
 
 const queue = async.queue(async (task, callback) => {
   const { characterId, message, accessToken, res } = task;
@@ -46,13 +21,9 @@ const queue = async.queue(async (task, callback) => {
     const chat = await isolatedCharacterAI.createOrContinueChat(characterId);
     const start = Date.now();
 
-    const browser = await initializeBrowser();
-    const page = await browser.newPage();
-    await page.setRequestInterception(true);
-    page.removeAllListeners('request');
-    page.on('request', (request) => {
-      request.continue();
-    });
+    const browser = await chromium.launch();
+    const context = await browser.newContext();
+    const page = await context.newPage();
 
     const response = await chat.sendAndAwaitResponse(message, true);
 
